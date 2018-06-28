@@ -121,9 +121,9 @@ if (!HTMLFormElement.prototype.onformdata || !window.FormDataEvent) {
       super(form);
       /** @type {!Element} */
       this.form = form;
-      /** @type {!Set<string>} */
+      /** @type {!Set<!Element>} */
       this[appended] = new Set();
-      /** @type {!Set<string>} */
+      /** @type {!Set<!Element>} */
       this[disabled] = new Set();
     }
     /**
@@ -213,7 +213,7 @@ if (!HTMLFormElement.prototype.onformdata || !window.FormDataEvent) {
     },
     /**
      * @this {HTMLFormElement}
-     * @param {function(!Event):boolean} fn
+     * @param {function(Event)} fn
      */
     set(fn) {
       if (this[formDataListener]) {

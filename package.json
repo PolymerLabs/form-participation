@@ -1,0 +1,33 @@
+{
+  "name": "form-participation",
+  "version": "0.1.0",
+  "description": "",
+  "main": "form-participation.js",
+  "devDependencies": {
+    "babel-core": "^6.26.3",
+    "babel-preset-minify": "^0.4.3",
+    "rollup": "^0.62.0",
+    "rollup-plugin-babel": "^3.0.7",
+    "rollup-plugin-typescript": "^0.8.1",
+    "typescript": "next"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rollup -c",
+    "prepack": "npm run build",
+    "rebuild-package-lock": "rm -rf node_modules package-lock.json && npm install"
+  },
+  "files": [
+    "form-participation.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/PolymerLabs/form-participation.git"
+  },
+  "author": "The Polymer Authors",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/PolymerLabs/form-participation/issues"
+  },
+  "homepage": "https://github.com/PolymerLabs/form-participation#readme"
+}

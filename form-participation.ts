@@ -14,11 +14,6 @@ declare global {
     formData?: FormData;
   }
 
-  interface HTMLFormElement {
-    onformdata: ((this: HTMLFormElement, ev: FormDataEvent) => any) | null;
-    [formDataListener]: ((this: HTMLFormElement, ev: FormDataEvent) => any) | null;
-  }
-
   interface FormDataEvent extends Event {
     readonly formData: FormData | null;
   }
@@ -26,6 +21,11 @@ declare global {
   var FormDataEvent: {
     prototype: FormDataEvent;
     new(typeArg: string, eventInitDict?: FormDataEventInit): FormDataEvent;
+  }
+
+  interface HTMLFormElement {
+    onformdata: EventListenerOrEventListenerObject | null;
+    [formDataListener]: EventListenerOrEventListenerObject | null;
   }
 
   interface Window {
@@ -36,20 +36,26 @@ declare global {
 
 if (!HTMLFormElement.prototype.onformdata || !window.FormDataEvent) {
 
-  const useNativeFormData = Boolean(window.FormData && window.FormData.prototype.set);
-
   const map = Symbol('formdata map');
 
-  class FormDataPolyfill implements FormData {
-    private [map]: Map<string, FormDataEntryValue[]>;
+  const appended = Symbol('form observer appended');
+  const disabled = Symbol('form observer disabled');
 
-    constructor(form?: HTMLFormElement) {
+  class ObservingFormData implements FormData {
+    private form: HTMLFormElement;
+
+    private [map]: Map<string, FormDataEntryValue[]>;
+    private [appended]: Set<Element>;
+    private [disabled]: Set<Element>;
+
+    constructor(form: HTMLFormElement) {
+      this.form = form;
+      this[appended] = new Set();
+      this[disabled] = new Set();
       this[map] = new Map();
-      if (form !== undefined) {
-        for (const el of form.elements as HTMLCollectionOf<HTMLInputElement>) {
-          if (el.hasAttribute('name')) {
-            this.append(el.name, el.value);
-          }
+      for (const el of form.elements as HTMLCollectionOf<HTMLInputElement>) {
+        if (el.hasAttribute('name')) {
+          this.append(el.name, el.value);
         }
       }
     }
@@ -58,27 +64,38 @@ if (!HTMLFormElement.prototype.onformdata || !window.FormDataEvent) {
         this[map].set(name, [] as FormDataEntryValue[]);
       }
       this[map].get(name)!.push(value);
+      const el = document.createElement('input');
+      el.type = 'hidden';
+      el.name = name;
+      el.value = value;
+      this.form.appendChild(el);
+      this[appended].add(el);
     }
     set(name: string, value: string) {
       this.delete(name);
       this.append(name, value);
     }
     delete(name: string) {
+      const oldEls = this.form.querySelectorAll(`[name=${name}]`);
+      for (const el of oldEls) {
+        el.setAttribute('disabled', '');
+        this[disabled].add(el);
+      }
       this[map].delete(name);
     }
-    get(name: string): FormDataEntryValue | null {
+    get(name: string) {
       return this.getAll(name)[0] || null;
     }
-    getAll(name: string): FormDataEntryValue[] {
+    getAll(name: string) {
       return this[map].get(name) || [];
     }
-    has(name: string): boolean {
+    has(name: string) {
       return this[map].has(name);
     }
-    *entries(): IterableIterator<[string, FormDataEntryValue]> {
+    *entries() {
       for (const [name, values] of this[map].entries()) {
         for (const value of values) {
-          yield [name, value];
+          yield [name, value] as [string, FormDataEntryValue];
         }
       }
     }
@@ -97,48 +114,9 @@ if (!HTMLFormElement.prototype.onformdata || !window.FormDataEvent) {
     [Symbol.iterator]() {
       return this.entries();
     }
-    forEach(callbackfn: (value: FormDataEntryValue, key: string, parent: FormData) => void, thisArg?: any) {
+    forEach(callbackFn: (value: FormDataEntryValue, key: string, parent: FormData) => void, thisArg?: any) {
       for (const [key, value] of this.entries()) {
-        callbackfn.call(thisArg, value, key, this);
-      }
-    }
-  }
-
-  const appended = Symbol('form observer appended');
-  const disabled = Symbol('form observer disabled');
-
-  const FormDataBase = useNativeFormData ? window.FormData : FormDataPolyfill;
-
-  class ObservingFormData extends FormDataBase {
-    private form: HTMLFormElement;
-    private [appended]: Set<Element>;
-    private [disabled]: Set<Element>;
-
-    constructor(form: HTMLFormElement) {
-      super(form);
-      this.form = form;
-      this[appended] = new Set();
-      this[disabled] = new Set();
-    }
-    append(name: string, value: string) {
-      super.append(name, value);
-      const el = document.createElement('input');
-      el.type = 'hidden';
-      el.name = name;
-      el.value = value;
-      this.form.appendChild(el);
-      this[appended].add(el);
-    }
-    set(name: string, value: string) {
-      this.delete(name);
-      this.append(name, value);
-    }
-    delete(name: string) {
-      super.delete(name);
-      const oldEls = this.form.querySelectorAll(`[name=${name}]`);
-      for (const el of oldEls) {
-        el.setAttribute('disabled', '');
-        this[disabled].add(el);
+        callbackFn.call(thisArg, value, key, this);
       }
     }
   }
@@ -155,28 +133,30 @@ if (!HTMLFormElement.prototype.onformdata || !window.FormDataEvent) {
   window.FormDataEvent = FormDataEvent;
 
   Object.defineProperty(HTMLFormElement.prototype, 'onformdata', {
-    get(this: HTMLFormElement): ((ev: FormDataEvent) => any) | null {
+    get(this: HTMLFormElement) {
       return this[formDataListener] || null;
     },
-    set(this: HTMLFormElement, fn: (ev: FormDataEvent) => any) {
+    set(this: HTMLFormElement, listener: EventListenerOrEventListenerObject | null) {
       if (this[formDataListener]) {
-        this.removeEventListener('formdata', this[formDataListener]! as EventListener);
+        this.removeEventListener('formdata', this[formDataListener]!);
       }
-      this.addEventListener('formdata', fn as EventListener);
-      this[formDataListener] = fn;
+      if (listener) {
+        this.addEventListener('formdata', listener);
+        this[formDataListener] = listener;
+      }
     },
     configurable: true
   });
 
   function resetFormData(formData: ObservingFormData) {
-    for (const el of formData[disabled]) {
+    formData[disabled].forEach((el) => {
       el.removeAttribute('disabled');
-    }
-    for (const el of formData[appended]) {
+    })
+    formData[appended].forEach((el) => {
       if (el.parentNode) {
         el.parentNode.removeChild(el);
       }
-    }
+    });
   }
 
   const oldSubmit = HTMLFormElement.prototype.submit;
@@ -200,7 +180,7 @@ if (!HTMLFormElement.prototype.onformdata || !window.FormDataEvent) {
   }, {capture: true});
 
   HTMLFormElement.prototype.submit = function() {
-    fireFormDataEventAndSubmit((this as HTMLFormElement));
+    fireFormDataEventAndSubmit(this);
   };
 }
 

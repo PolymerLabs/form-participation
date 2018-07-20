@@ -6,6 +6,7 @@
   "devDependencies": {
     "babel-core": "^6.26.3",
     "babel-preset-minify": "^0.4.3",
+    "google-closure-compiler": "^20180716.0.1",
     "rollup": "^0.63.2",
     "rollup-plugin-babel": "^3.0.7",
     "rollup-plugin-typescript": "^0.8.1",
@@ -16,6 +17,7 @@
     "debug": "tsc",
     "build": "rollup -c",
     "prepack": "npm run build",
+    "closure": "npm run debug && google-closure-compiler --js form-participation.js --js_output_file form-participation.min.js --externs form-participation-externs.js --isolation_mode IIFE -O ADVANCED --language_in ES6_STRICT --language_out ES5_STRICT --rewrite_polyfills false",
     "rebuild-package-lock": "rm -rf node_modules package-lock.json && npm install"
   },
   "files": [

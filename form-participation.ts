@@ -124,6 +124,10 @@ if (!HTMLFormElement.prototype.onformdata || !window.FormDataEvent) {
   class FormDataEvent extends Event {
     formData: FormData | null;
 
+    /**
+     * @param {string} name
+     * @param {FormDataEventInit=} options
+     */
     constructor(name: string, options?: FormDataEventInit) {
       super(name, options);
       this.formData = options && options.formData || null;
@@ -163,13 +167,14 @@ if (!HTMLFormElement.prototype.onformdata || !window.FormDataEvent) {
 
   function fireFormDataEventAndSubmit(form: HTMLFormElement) {
     const formData = new ObservingFormData(form);
-    const ev = new window.FormDataEvent('formdata', {bubbles: true, formData: formData as FormData});
+    const options: FormDataEventInit = {bubbles: true, formData};
+    const ev = new window.FormDataEvent('formdata', /** @type {!FormDataEventInit} */(options));
     form.dispatchEvent(ev);
     oldSubmit.call(form);
     resetFormData(formData);
   }
 
-  addEventListener('submit', (e) => {
+  window.addEventListener('submit', (e) => {
     const target = e.target;
     if (!(target instanceof HTMLFormElement)) {
       return;
